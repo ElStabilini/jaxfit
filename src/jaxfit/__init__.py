@@ -5,6 +5,9 @@ Created on Mon Mar 14 19:26:59 2022
 @author: hofer
 """
 
+from .jax_compat import enable_x64
+
+enable_x64()
 
 from .minpack import *
 from .least_squares import *

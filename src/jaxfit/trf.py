@@ -90,10 +90,12 @@ from numpy.linalg import norm
 import time
 from typing import Callable, Optional, Tuple, Union, List, Dict, Any, Sequence
 
-from jax.config import config
-config.update("jax_enable_x64", True)
+from jaxfit.jax_compat import enable_x64
+
+enable_x64()
+
 import jax.numpy as jnp
-from jax.scipy.linalg import svd as jax_svd
+from jaxfit.jax_compat import jax_svd
 from jax import jit
 from jax.tree_util import tree_flatten
 

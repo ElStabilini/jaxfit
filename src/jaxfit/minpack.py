@@ -5,13 +5,13 @@ from inspect import signature
 import time
 from typing import Optional, Callable, Tuple, Union, List, Dict, Any
 
-from jax.config import config
-config.update("jax_enable_x64", True)
+from jaxfit.jax_compat import enable_x64
+
+enable_x64()
 
 import jax.numpy as jnp
 from jax import jit
-from jax.scipy.linalg import svd as jax_svd
-from jax.scipy.linalg import cholesky as jax_cholesky
+from jaxfit.jax_compat import jax_svd, jax_cholesky
 
 from jaxfit._optimize import OptimizeWarning
 from jaxfit.least_squares import prepare_bounds, LeastSquares

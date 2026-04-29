@@ -4,11 +4,13 @@ import numpy as np
 import time
 from typing import Callable, Optional, Tuple, Union, Sequence, List, Any
 
-from jax.config import config
-config.update("jax_enable_x64", True)
+from jaxfit.jax_compat import enable_x64
+
+enable_x64()
+
 import jax.numpy as jnp
 from jax import jit, jacfwd
-from jax.scipy.linalg import solve_triangular as jax_solve_triangular
+from jaxfit.jax_compat import jax_solve_triangular
 
 from jaxfit.trf import TrustRegionReflective
 from jaxfit.loss_functions import LossFunctionsJIT
