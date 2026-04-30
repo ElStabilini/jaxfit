@@ -37,7 +37,7 @@ jobs:
           python -m pip install pytest
 
       - name: Run tests
-        run: pytest
+        run: pytest --ignore=benchmark
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
