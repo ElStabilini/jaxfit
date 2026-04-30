@@ -76,8 +76,8 @@ First and foremost by default JAX enforces single precision (32-bit, e.g. `float
 JAXFit does this when it is imported, but should you import JAX before JAXFit, then you'll need to set this flag yourself e.g.
 
 ```python
-from jax.config import config
-config.update("jax_enable_x64", True)
+from jax import config as jax_config
+jax_config.update("jax_enable_x64", True)
 
 import jax.numpy as jnp
 from jaxfit import CurveFit
@@ -97,7 +97,7 @@ Some standouts:
 
 ## Installation
 
-JAXFit is written in pure Python and is based on the JAX package. JAX therefore needs to be installed before installing JAXFit via pip. JAX installation requires 
+JAXFit is written in pure Python and is based on the JAX package. JAX therefore needs to be installed before installing JAXFit via pip. JAXFit supports JAX/jaxlib versions 0.7.1 through 0.9.2. JAX installation requires 
 a bit of effort since it is optimized for the computer hardware you'll be using (GPU vs. CPU). 
 
 Installing JAX on Linux is natively supported by the JAX team and instructions

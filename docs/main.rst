@@ -107,8 +107,8 @@ JAXFit, then you’ll need to set this flag yourself e.g.
 
 .. code:: python
 
-   from jax.config import config
-   config.update("jax_enable_x64", True)
+   from jax import config as jax_config
+   jax_config.update("jax_enable_x64", True)
 
    import jax.numpy as jnp
    from jaxfit import CurveFit

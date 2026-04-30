@@ -5,8 +5,8 @@ Created on Tue May 10 16:22:03 2022
 @author: hofer
 """
 
-from jax.config import config
-config.update("jax_enable_x64", True)
+from jax import config as jax_config
+jax_config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
 

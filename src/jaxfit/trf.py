@@ -95,9 +95,8 @@ from jaxfit.jax_compat import enable_x64
 enable_x64()
 
 import jax.numpy as jnp
-from jaxfit.jax_compat import jax_svd
+from jaxfit.jax_compat import jax_svd, jax_tree_flatten
 from jax import jit
-from jax.tree_util import tree_flatten
 
 from jaxfit.common_scipy import (update_tr_radius, solve_lsq_trust_region, 
                     check_termination, CL_scaling_vector,
@@ -1280,7 +1279,7 @@ class TrustRegionReflective(TrustRegionJITFunctions):
             
             st = time.time()
             svd_output = self.svd_no_bounds(J, d_jnp, f)
-            tree_flatten(svd_output)[0][0].block_until_ready()
+            jax_tree_flatten(svd_output)[0][0].block_until_ready()
             svd_times.append(time.time() - st)
             J_h = svd_output[0]
             
