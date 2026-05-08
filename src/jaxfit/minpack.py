@@ -1,6 +1,6 @@
 import warnings
 import numpy as np
-from numpy import (zeros, inf)
+from numpy import zeros, inf
 from inspect import signature
 import time
 from typing import Optional, Callable, Tuple, Union, List, Dict, Any
@@ -17,7 +17,22 @@ from jaxfit._optimize import OptimizeWarning
 from jaxfit.least_squares import prepare_bounds, LeastSquares
 from jaxfit.common_scipy import EPS
 
-__all__ = ['CurveFit', 'curve_fit']
+try:
+    from jax import Array as JaxArray
+except Exception:  # pragma: no cover
+    JaxArray = ()
+
+try:
+    from jaxlib.xla_extension import ArrayImpl as JaxArrayImpl
+except Exception:  # pragma: no cover
+    JaxArrayImpl = ()
+
+__all__ = ["CurveFit", "curve_fit"]
+
+
+def _is_array_like(value: Any) -> bool:
+    return isinstance(value, (np.ndarray, JaxArray, JaxArrayImpl))
+
 
 def curve_fit(f, *args, **kwargs):
     jcf = CurveFit(f)
@@ -28,12 +43,12 @@ def curve_fit(f, *args, **kwargs):
 def _initialize_feasible(lb: np.ndarray, ub: np.ndarray) -> np.ndarray:
     """Initialize feasible parameters for optimization.
 
-    This function initializes feasible parameters for optimization based on the 
-    lower and upper bounds of the variables. If both bounds are finite, the 
-    feasible parameters are set to the midpoint between the bounds. If only the 
-    lower bound is finite, the feasible parameters are set to the lower bound 
-    plus 1. If only the upper bound is finite, the feasible parameters are set 
-    to the upper bound minus 1. If neither bound is finite, the feasible 
+    This function initializes feasible parameters for optimization based on the
+    lower and upper bounds of the variables. If both bounds are finite, the
+    feasible parameters are set to the midpoint between the bounds. If only the
+    lower bound is finite, the feasible parameters are set to the lower bound
+    plus 1. If only the upper bound is finite, the feasible parameters are set
+    to the upper bound minus 1. If neither bound is finite, the feasible
     parameters are set to 1.
 
     Parameters
@@ -65,22 +80,21 @@ def _initialize_feasible(lb: np.ndarray, ub: np.ndarray) -> np.ndarray:
     return p0
 
 
-class CurveFit():
-    
+class CurveFit:
+
     def __init__(self, flength: Optional[float] = None):
         """CurveFit class for fitting
 
         Parameters
         ----------
         flength : float, optional
-            fixed data length for fits, JAXFit pads input data to this length 
+            fixed data length for fits, JAXFit pads input data to this length
             to avoid retracing.
         """
         self.flength = flength
         self.create_sigma_transform_funcs()
         self.create_covariance_svd()
         self.ls = LeastSquares()
-
 
     def update_flength(self, flength: float):
         """Set the fixed input data length.
@@ -91,21 +105,20 @@ class CurveFit():
             The fixed input data length.
         """
         self.flength = flength
-                
-        
+
     def create_sigma_transform_funcs(self):
         """Create JIT-compiled sigma transform functions.
 
-        This function creates two JIT-compiled functions: `sigma_transform1d` and 
-        `sigma_transform2d`, which are used to compute the sigma transform for 1D 
-        and 2D data, respectively. The functions are stored as attributes of the 
+        This function creates two JIT-compiled functions: `sigma_transform1d` and
+        `sigma_transform2d`, which are used to compute the sigma transform for 1D
+        and 2D data, respectively. The functions are stored as attributes of the
         object on which the method is called.
         """
 
         @jit
-        def sigma_transform1d(sigma: jnp.ndarray, 
-                      data_mask: jnp.ndarray
-                     ) -> jnp.ndarray:
+        def sigma_transform1d(
+            sigma: jnp.ndarray, data_mask: jnp.ndarray
+        ) -> jnp.ndarray:
             """Compute the sigma transform for 1D data.
 
             Parameters
@@ -124,9 +137,9 @@ class CurveFit():
             return transform
 
         @jit
-        def sigma_transform2d(sigma: jnp.ndarray, 
-                              data_mask: jnp.ndarray
-                              ) -> jnp.ndarray:
+        def sigma_transform2d(
+            sigma: jnp.ndarray, data_mask: jnp.ndarray
+        ) -> jnp.ndarray:
             """Compute the sigma transform for 2D data.
 
             Parameters
@@ -150,27 +163,26 @@ class CurveFit():
         """For fixed input arrays we need to pad the actual data to match the 
         fixed input array size"""
 
-    def create_covariance_svd(self): 
+    def create_covariance_svd(self):
         """Create JIT-compiled SVD function for covariance computation."""
+
         @jit
         def covariance_svd(jac):
             _, s, VT = jax_svd(jac, full_matrices=False)
             return s, VT
+
         self.covariance_svd = covariance_svd
-        
-        
-    def pad_fit_data(self, xdata: np.ndarray, 
-                     ydata: np.ndarray, 
-                     xdims: int, 
-                     len_diff: int
-                     ) -> Tuple[np.ndarray, np.ndarray]:
+
+    def pad_fit_data(
+        self, xdata: np.ndarray, ydata: np.ndarray, xdims: int, len_diff: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Pad fit data to match the fixed input data length.
 
-        This function pads the input data arrays with small values to match the 
+        This function pads the input data arrays with small values to match the
         fixed input data length to avoid JAX retracing the JITted functions.
-        The padding is added along the second dimension of the `xdata` array 
-        if it's multidimensional data otherwise along the first dimension. The 
-        small values are chosen to be `EPS`, a global constant defined as a 
+        The padding is added along the second dimension of the `xdata` array
+        if it's multidimensional data otherwise along the first dimension. The
+        small values are chosen to be `EPS`, a global constant defined as a
         very small positive value which avoids numerical issues.
 
         Parameters
@@ -189,7 +201,7 @@ class CurveFit():
         Tuple[np.ndarray, np.ndarray]
             The padded `xdata` and `ydata` arrays.
         """
-        
+
         if xdims > 1:
             xpad = EPS * np.ones([xdims, len_diff])
             xdata = np.concatenate([xdata, xpad], axis=1)
@@ -200,24 +212,23 @@ class CurveFit():
         ydata = np.concatenate([ydata, ypad])
         return xdata, ydata
 
-        
-        
-    def curve_fit(self, 
-                  f: Callable, 
-                  xdata: Union[np.ndarray, Tuple[np.ndarray]],
-                  ydata: np.ndarray, 
-                  p0: Optional[np.ndarray] = None, 
-                  sigma: Optional[np.ndarray] = None, 
-                  absolute_sigma: bool = False, 
-                  check_finite: bool = True,
-                  bounds: Tuple[np.ndarray, np.ndarray] = (-np.inf, np.inf), 
-                  method: Optional[str] = None, 
-                  jac: Optional[Callable] = None,
-                  data_mask: Optional[np.ndarray] = None, 
-                  timeit: bool = False, 
-                  return_eval: bool = False,
-                  **kwargs
-                  ) -> Tuple[np.ndarray, np.ndarray]:
+    def curve_fit(
+        self,
+        f: Callable,
+        xdata: Union[np.ndarray, Tuple[np.ndarray]],
+        ydata: np.ndarray,
+        p0: Optional[np.ndarray] = None,
+        sigma: Optional[np.ndarray] = None,
+        absolute_sigma: bool = False,
+        check_finite: bool = True,
+        bounds: Tuple[np.ndarray, np.ndarray] = (-np.inf, np.inf),
+        method: Optional[str] = None,
+        jac: Optional[Callable] = None,
+        data_mask: Optional[np.ndarray] = None,
+        timeit: bool = False,
+        return_eval: bool = False,
+        **kwargs
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Use non-linear least squares to fit a function, f, to data.
         Assumes ``ydata = f(xdata, *params) + eps``.
@@ -318,7 +329,7 @@ class CurveFit():
         See Also
         --------
         least_squares : Minimize the sum of squares of nonlinear functions.
-        
+
         Notes
         -----
         Refer to the docstring of `least_squares` for more information.
@@ -357,7 +368,7 @@ class CurveFit():
         >>> plt.legend()
         >>> plt.show()
         """
-        
+
         if p0 is None:
             # determine number of parameters by inspecting the function
             sig = signature(f)
@@ -368,22 +379,22 @@ class CurveFit():
         else:
             p0 = np.atleast_1d(p0)
             n = p0.size
-                    
+
         lb, ub = prepare_bounds(bounds, n)
         if p0 is None:
             p0 = _initialize_feasible(lb, ub)
-            
+
         if method is None:
-            method = 'trf'
+            method = "trf"
 
         # NaNs cannot be handled
         if check_finite:
             ydata = np.asarray_chkfinite(ydata, float)
         else:
             ydata = np.asarray(ydata, float)
-    
-        if isinstance(xdata, (list, tuple, np.ndarray)):
-            #should we be able to pass jax arrays
+
+        if isinstance(xdata, (list, tuple)) or _is_array_like(xdata):
+            # should we be able to pass jax arrays
             # `xdata` is passed straight to the user-defined `f`, so allow
             # non-array_like `xdata`.
             if check_finite:
@@ -391,12 +402,12 @@ class CurveFit():
             else:
                 xdata = np.asarray(xdata, float)
         else:
-            raise ValueError('X needs arrays')
-    
+            raise ValueError("X needs arrays")
+
         if ydata.size == 0:
             raise ValueError("`ydata` must not be empty!")
-            
-        m = len(ydata)            
+
+        m = len(ydata)
         xdims = xdata.ndim
         if xdims == 1:
             xlen = len(xdata)
@@ -404,41 +415,43 @@ class CurveFit():
             xlen = len(xdata[0])
         if xlen != m:
             print(xdata.shape, ydata.shape)
-            raise ValueError('X and Y data lengths dont match')
-        
+            raise ValueError("X and Y data lengths dont match")
+
         if data_mask is None:
             none_mask = True
         else:
             none_mask = False
-            
+
         if self.flength is not None:
             len_diff = self.flength - m
             if data_mask is not None:
                 if len(data_mask) != m:
-                    raise ValueError('Data mask doesnt match data lengths.')
+                    raise ValueError("Data mask doesnt match data lengths.")
             else:
                 data_mask = np.ones(m, dtype=bool)
                 if len_diff > 0:
-                    data_mask = np.concatenate([data_mask, 
-                                                np.zeros(len_diff, dtype=bool)])
+                    data_mask = np.concatenate(
+                        [data_mask, np.zeros(len_diff, dtype=bool)]
+                    )
         else:
             len_diff = 0
             data_mask = np.ones(m, dtype=bool)
-            
-        
+
         if self.flength is not None:
             if len_diff >= 0:
                 xdata, ydata = self.pad_fit_data(xdata, ydata, xdims, len_diff)
             else:
-                print('Data length greater than fixed length. This means retracing will occur')
-            
-                   # Determine type of sigma
-        if sigma is not None:   
-            if not isinstance(sigma, np.ndarray):
-                raise ValueError('Sigma must be numpy array.')
+                print(
+                    "Data length greater than fixed length. This means retracing will occur"
+                )
+
+                # Determine type of sigma
+        if sigma is not None:
+            if not _is_array_like(sigma):
+                raise ValueError("Sigma must be numpy or JAX array.")
             # if 1-D, sigma are errors, define transform = 1/sigma
             ysize = ydata.size - len_diff
-            if sigma.shape == (ysize, ):
+            if sigma.shape == (ysize,):
                 if len_diff > 0:
                     sigma = np.concatenate([sigma, np.ones([len_diff])])
                 transform = self.sigma_transform1d(sigma, data_mask)
@@ -448,30 +461,29 @@ class CurveFit():
                 try:
                     if len_diff >= 0:
                         sigma_padded = np.identity(m + len_diff)
-                        sigma_padded[:m,:m] = sigma
+                        sigma_padded[:m, :m] = sigma
                         sigma = sigma_padded
                     # scipy.linalg.cholesky requires lower=True to return L L^T = A
                     transform = self.sigma_transform2d(sigma, data_mask)
                 except:
                     raise ValueError("Probably:`sigma` must be positive definite.")
             else:
-                print('sigma shape', sigma.shape)
-                print('y shape', ydata.shape, ydata.size)
+                print("sigma shape", sigma.shape)
+                print("y shape", ydata.shape, ydata.size)
                 print(len_diff)
                 raise ValueError("`sigma` has incorrect shape.")
         else:
             transform = None
-            
 
-        if 'args' in kwargs:
+        if "args" in kwargs:
             # The specification for the model function `f` does not support
             # additional arguments. Refer to the `curve_fit` docstring for
             # acceptable call signatures of `f`.
             raise ValueError("'args' is not a supported keyword argument.")
-    
-        if 'max_nfev' not in kwargs:
-            kwargs['max_nfev'] = kwargs.pop('maxfev', None)
-        
+
+        if "max_nfev" not in kwargs:
+            kwargs["max_nfev"] = kwargs.pop("maxfev", None)
+
         st = time.time()
         if timeit:
             jnp_xdata = jnp.array(np.copy(xdata)).block_until_ready()
@@ -482,10 +494,19 @@ class CurveFit():
         ctime = time.time() - st
 
         jnp_data_mask = jnp.array(data_mask, dtype=bool)
-        res = self.ls.least_squares(f, p0, jac=jac, xdata=jnp_xdata, 
-                                    ydata=jnp_ydata, data_mask=jnp_data_mask, 
-                                    transform=transform, bounds=bounds, 
-                                    method=method, timeit=timeit, **kwargs)
+        res = self.ls.least_squares(
+            f,
+            p0,
+            jac=jac,
+            xdata=jnp_xdata,
+            ydata=jnp_ydata,
+            data_mask=jnp_data_mask,
+            transform=transform,
+            bounds=bounds,
+            method=method,
+            timeit=timeit,
+            **kwargs
+        )
 
         if not res.success:
             raise RuntimeError("Optimal parameters not found: " + res.message)
@@ -502,10 +523,10 @@ class CurveFit():
         s, VT = [np.array(output) for output in outputs]
         threshold = np.finfo(float).eps * max(res.jac.shape) * s[0]
         s = s[s > threshold]
-        VT = VT[:s.size]
+        VT = VT[: s.size]
         pcov = np.dot(VT.T / s**2, VT)
         return_full = False
-    
+
         warn_cov = False
         if pcov is None:
             # indeterminate covariance
@@ -519,10 +540,12 @@ class CurveFit():
             else:
                 pcov.fill(inf)
                 warn_cov = True
-    
+
         if warn_cov:
-            warnings.warn('Covariance of the parameters could not be estimated',
-                          category=OptimizeWarning)
+            warnings.warn(
+                "Covariance of the parameters could not be estimated",
+                category=OptimizeWarning,
+            )
 
         # self.res = res
         post_time = time.time() - st
@@ -536,9 +559,9 @@ class CurveFit():
             else:
                 return popt, pcov, feval
         else:
-            #lower GPU memory usage
-            res.pop('jac')
-            res.pop('fun')
+            # lower GPU memory usage
+            res.pop("jac")
+            res.pop("fun")
 
         if return_full:
             raise RuntimeError("Return full only works for LM")
@@ -547,7 +570,3 @@ class CurveFit():
             return popt, pcov, res, post_time, ctime
         else:
             return popt, pcov
-
-            
-
-    
